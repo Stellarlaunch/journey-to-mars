@@ -1,0 +1,1584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Journey to Mars — An Interactive Odyssey</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&family=Space+Mono:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    /* ============================================================
+       CSS VARIABLES & RESET
+    ============================================================ */
+    :root {
+      --black:       #000008;
+      --deep-space:  #050510;
+      --void:        #0a0a1a;
+      --mars-dark:   #1a0800;
+      --mars-mid:    #8b2500;
+      --mars-red:    #c1440e;
+      --mars-orange: #e8622a;
+      --mars-glow:   #ff6b35;
+      --star-white:  #e8e8ff;
+      --nebula-blue: #1a3a6e;
+      --nebula-purple:#2d1b4e;
+      --text-primary:#f0f0ff;
+      --text-dim:    #8888aa;
+      --accent:      #ff6b35;
+      --font-display:"Orbitron", monospace;
+      --font-body:   "Rajdhani", sans-serif;
+      --font-mono:   "Space Mono", monospace;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    html { scroll-behavior: smooth; overflow-x: hidden; }
+
+    body {
+      background: var(--black);
+      color: var(--text-primary);
+      font-family: var(--font-body);
+      font-size: 18px;
+      line-height: 1.6;
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ============================================================
+       CUSTOM CURSOR
+    ============================================================ */
+    .cursor {
+      position: fixed;
+      width: 12px; height: 12px;
+      background: var(--mars-glow);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%);
+      transition: transform 0.1s, width 0.3s, height 0.3s, background 0.3s;
+      mix-blend-mode: screen;
+    }
+    .cursor-ring {
+      position: fixed;
+      width: 40px; height: 40px;
+      border: 1px solid rgba(255,107,53,0.5);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 9998;
+      transform: translate(-50%, -50%);
+      transition: transform 0.15s ease-out, width 0.3s, height 0.3s;
+    }
+
+    /* ============================================================
+       SCROLLBAR
+    ============================================================ */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--black); }
+    ::-webkit-scrollbar-thumb { background: var(--mars-red); border-radius: 2px; }
+
+    /* ============================================================
+       LOADING SCREEN
+    ============================================================ */
+    #loader {
+      position: fixed; inset: 0;
+      background: var(--black);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.8s ease, visibility 0.8s;
+    }
+    #loader.hidden { opacity: 0; visibility: hidden; }
+
+    .loader-ring {
+      width: 80px; height: 80px;
+      border: 2px solid transparent;
+      border-top-color: var(--mars-glow);
+      border-right-color: var(--mars-red);
+      border-radius: 50%;
+      animation: spin 1.2s linear infinite;
+      margin-bottom: 24px;
+    }
+    .loader-text {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      letter-spacing: 0.4em;
+      color: var(--mars-orange);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    .loader-pct {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+    /* ============================================================
+       STARFIELD CANVAS
+    ============================================================ */
+    #starCanvas {
+      position: fixed; inset: 0;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ============================================================
+       NAV
+    ============================================================ */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 20px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(0,0,8,0.9), transparent);
+      backdrop-filter: blur(2px);
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 0.75rem;
+      letter-spacing: 0.3em;
+      color: var(--mars-glow);
+      text-transform: uppercase;
+    }
+    .nav-links {
+      display: flex; gap: 32px; list-style: none;
+    }
+    .nav-links a {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: color 0.3s;
+      position: relative;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute; bottom: -4px; left: 0; right: 0;
+      height: 1px;
+      background: var(--mars-glow);
+      transform: scaleX(0);
+      transition: transform 0.3s;
+    }
+    .nav-links a:hover { color: var(--mars-glow); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+
+    .progress-bar {
+      position: fixed; top: 0; left: 0;
+      height: 2px;
+      background: linear-gradient(to right, var(--mars-red), var(--mars-glow));
+      z-index: 200;
+      width: 0%;
+      transition: width 0.1s;
+      box-shadow: 0 0 10px var(--mars-glow);
+    }
+
+    /* ============================================================
+       SECTIONS — SHARED
+    ============================================================ */
+    section {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.4em;
+      color: var(--mars-red);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.8s, transform 0.8s;
+    }
+    .section-label.visible { opacity: 1; transform: translateY(0); }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s ease, transform 0.9s ease;
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal.delay-1 { transition-delay: 0.15s; }
+    .reveal.delay-2 { transition-delay: 0.3s; }
+    .reveal.delay-3 { transition-delay: 0.45s; }
+    .reveal.delay-4 { transition-delay: 0.6s; }
+
+    /* ============================================================
+       SECTION 1 — HERO / EARTH
+    ============================================================ */
+    #hero {
+      background: radial-gradient(ellipse at 50% 60%, #0d1f3c 0%, #000008 70%);
+      flex-direction: column;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .earth-container {
+      position: relative;
+      width: 280px; height: 280px;
+      margin: 0 auto 60px;
+    }
+    .earth {
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 35%, #1e5f8c 0%, transparent 50%),
+        radial-gradient(circle at 70% 60%, #2d8a4e 0%, transparent 40%),
+        radial-gradient(circle at 20% 70%, #1a4d7a 0%, transparent 35%),
+        linear-gradient(135deg, #1a5276, #0d3b6e, #1a6b3a, #0a3d62);
+      box-shadow:
+        0 0 60px rgba(30,100,180,0.4),
+        0 0 120px rgba(30,100,180,0.2),
+        inset -30px -30px 60px rgba(0,0,0,0.5);
+      animation: earthRotate 20s linear infinite;
+      position: relative;
+      overflow: hidden;
+    }
+    .earth::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 25%, rgba(255,255,255,0.15) 0%, transparent 40%),
+        radial-gradient(circle at 60% 55%, rgba(255,255,255,0.08) 0%, transparent 30%);
+    }
+    .earth-clouds {
+      position: absolute; inset: -5px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 40% 30%, rgba(255,255,255,0.2) 0%, transparent 25%),
+        radial-gradient(circle at 75% 50%, rgba(255,255,255,0.15) 0%, transparent 20%),
+        radial-gradient(circle at 20% 65%, rgba(255,255,255,0.12) 0%, transparent 22%);
+      animation: cloudDrift 30s linear infinite;
+    }
+    .earth-glow {
+      position: absolute; inset: -20px;
+      border-radius: 50%;
+      background: radial-gradient(circle, transparent 50%, rgba(30,100,180,0.15) 70%, transparent 85%);
+      animation: glowPulse 4s ease-in-out infinite;
+    }
+    .orbit-ring {
+      position: absolute; inset: -40px;
+      border: 1px solid rgba(100,180,255,0.15);
+      border-radius: 50%;
+      animation: orbitSpin 8s linear infinite;
+    }
+    .orbit-dot {
+      position: absolute; top: -4px; left: 50%;
+      width: 8px; height: 8px;
+      background: var(--mars-glow);
+      border-radius: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 0 10px var(--mars-glow);
+    }
+
+    @keyframes earthRotate {
+      from { filter: hue-rotate(0deg); }
+      to   { filter: hue-rotate(5deg); }
+    }
+    @keyframes cloudDrift {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    @keyframes glowPulse {
+      0%,100% { opacity: 0.6; }
+      50%      { opacity: 1; }
+    }
+    @keyframes orbitSpin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.5em;
+      color: var(--mars-red);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      animation: fadeInUp 1s ease 0.3s both;
+    }
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(2.5rem, 7vw, 5.5rem);
+      font-weight: 900;
+      line-height: 0.95;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff 0%, #ffaa88 50%, var(--mars-glow) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 24px;
+      animation: fadeInUp 1s ease 0.5s both;
+    }
+    .hero-sub {
+      font-family: var(--font-body);
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-dim);
+      max-width: 500px;
+      margin: 0 auto 48px;
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      animation: fadeInUp 1s ease 0.7s both;
+    }
+
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 40px;
+      border: 1px solid var(--mars-red);
+      background: transparent;
+      color: var(--text-primary);
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      text-decoration: none;
+      cursor: none;
+      position: relative;
+      overflow: hidden;
+      transition: color 0.4s;
+      animation: fadeInUp 1s ease 0.9s both;
+    }
+    .cta-btn::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: var(--mars-red);
+      transform: translateX(-100%);
+      transition: transform 0.4s ease;
+    }
+    .cta-btn:hover::before { transform: translateX(0); }
+    .cta-btn span { position: relative; z-index: 1; }
+    .cta-arrow { position: relative; z-index: 1; transition: transform 0.3s; }
+    .cta-btn:hover .cta-arrow { transform: translateX(4px); }
+
+    .scroll-hint {
+      position: absolute;
+      bottom: 40px; left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      animation: fadeInUp 1s ease 1.5s both;
+    }
+    .scroll-hint span {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.3em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+    .scroll-line {
+      width: 1px; height: 50px;
+      background: linear-gradient(to bottom, var(--mars-red), transparent);
+      animation: scrollDrop 2s ease-in-out infinite;
+    }
+    @keyframes scrollDrop {
+      0%   { transform: scaleY(0); transform-origin: top; }
+      50%  { transform: scaleY(1); transform-origin: top; }
+      51%  { transform: scaleY(1); transform-origin: bottom; }
+      100% { transform: scaleY(0); transform-origin: bottom; }
+    }
+    @keyframes fadeInUp {
+      from { opacity:0; transform:translateY(30px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+
+    /* ============================================================
+       SECTION 2 — LAUNCH
+    ============================================================ */
+    #launch {
+      background: linear-gradient(to bottom, #000008 0%, #0a0305 100%);
+      flex-direction: column;
+      padding: 80px 24px;
+    }
+    .launch-inner {
+      max-width: 1100px;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+    .launch-visual {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+    .rocket-wrapper {
+      position: relative;
+      width: 80px;
+      animation: rocketFloat 3s ease-in-out infinite;
+    }
+    .rocket-wrapper.launching {
+      animation: rocketLaunch 2s ease-in forwards;
+    }
+    @keyframes rocketFloat {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-16px); }
+    }
+    @keyframes rocketLaunch {
+      0%   { transform: translateY(0) scale(1); opacity: 1; }
+      100% { transform: translateY(-300px) scale(0.3); opacity: 0; }
+    }
+
+    .rocket-svg { width: 80px; }
+
+    .exhaust {
+      position: absolute;
+      bottom: -30px; left: 50%;
+      transform: translateX(-50%);
+      width: 20px;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .exhaust-flame {
+      width: 100%; height: 40px;
+      background: linear-gradient(to bottom, var(--mars-glow), var(--mars-red), transparent);
+      clip-path: polygon(30% 0%, 70% 0%, 85% 100%, 15% 100%);
+      animation: flamePulse 0.2s ease-in-out infinite alternate;
+      border-radius: 0 0 50% 50%;
+    }
+    @keyframes flamePulse {
+      from { transform: scaleX(0.8) scaleY(0.9); opacity: 0.8; }
+      to   { transform: scaleX(1.1) scaleY(1.1); opacity: 1; }
+    }
+
+    .launch-pad {
+      width: 120px; height: 8px;
+      background: linear-gradient(to right, transparent, #444, transparent);
+      border-radius: 4px;
+      margin-top: 30px;
+    }
+    .launch-pad-legs {
+      display: flex; gap: 60px; margin-top: 2px;
+    }
+    .pad-leg {
+      width: 2px; height: 20px;
+      background: #555;
+      transform-origin: top;
+    }
+    .pad-leg:first-child { transform: rotate(15deg); }
+    .pad-leg:last-child  { transform: rotate(-15deg); }
+
+    .countdown-display {
+      font-family: var(--font-display);
+      font-size: 4rem;
+      font-weight: 900;
+      color: var(--mars-glow);
+      text-shadow: 0 0 30px var(--mars-glow);
+      text-align: center;
+      margin-top: 32px;
+      letter-spacing: 0.1em;
+      min-height: 80px;
+    }
+
+    .launch-text h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      font-weight: 700;
+      line-height: 1.1;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+    }
+    .launch-text h2 em {
+      font-style: normal;
+      color: var(--mars-glow);
+    }
+    .launch-text p {
+      color: var(--text-dim);
+      font-size: 1rem;
+      font-weight: 300;
+      margin-bottom: 32px;
+      line-height: 1.8;
+    }
+    .launch-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 32px;
+      background: var(--mars-red);
+      border: none;
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: none;
+      transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+    }
+    .launch-btn:hover {
+      background: var(--mars-glow);
+      box-shadow: 0 0 30px rgba(255,107,53,0.5);
+      transform: translateY(-2px);
+    }
+    .launch-btn:active { transform: translateY(0); }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 32px;
+    }
+    .stat-card {
+      padding: 16px;
+      border: 1px solid rgba(255,107,53,0.15);
+      background: rgba(255,107,53,0.03);
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--mars-glow), transparent);
+      transform: scaleX(0);
+      transition: transform 0.5s;
+    }
+    .stat-card:hover::before { transform: scaleX(1); }
+    .stat-card:hover {
+      border-color: rgba(255,107,53,0.4);
+      background: rgba(255,107,53,0.06);
+    }
+    .stat-val {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--mars-glow);
+      display: block;
+    }
+    .stat-lbl {
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ============================================================
+       SECTION 3 — SPACE TRAVEL
+    ============================================================ */
+    #space {
+      background: linear-gradient(to bottom, #000008 0%, #080012 50%, #000008 100%);
+      flex-direction: column;
+      padding: 100px 24px;
+      min-height: 140vh;
+    }
+    .space-inner {
+      max-width: 900px;
+      text-align: center;
+      position: relative;
+    }
+    .space-inner h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+    .space-inner p {
+      color: var(--text-dim);
+      font-size: 1rem;
+      max-width: 600px;
+      margin: 0 auto 60px;
+      font-weight: 300;
+    }
+
+    .distance-tracker {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto 60px;
+      position: relative;
+    }
+    .tracker-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+    .tracker-bar {
+      width: 100%; height: 2px;
+      background: rgba(255,255,255,0.1);
+      position: relative;
+    }
+    .tracker-fill {
+      height: 100%;
+      background: linear-gradient(to right, #1a5cad, var(--mars-glow), var(--mars-red));
+      width: 0%;
+      transition: width 1.5s ease;
+      box-shadow: 0 0 10px var(--mars-glow);
+    }
+    .tracker-rocket {
+      position: absolute;
+      top: 50%; right: 0;
+      transform: translate(50%, -50%) rotate(90deg);
+      font-size: 1rem;
+      transition: right 1.5s ease;
+    }
+    .tracker-km {
+      text-align: center;
+      font-family: var(--font-display);
+      font-size: 2rem;
+      color: var(--mars-glow);
+      margin-top: 16px;
+      text-shadow: 0 0 20px var(--mars-glow);
+    }
+    .tracker-km-label {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.3em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .space-facts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+    .fact-card {
+      padding: 24px 20px;
+      border: 1px solid rgba(255,255,255,0.07);
+      background: rgba(255,255,255,0.02);
+      text-align: left;
+      position: relative;
+      cursor: none;
+      overflow: hidden;
+      transition: transform 0.3s, border-color 0.3s;
+    }
+    .fact-card::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(255,107,53,0.08), transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .fact-card:hover::after { opacity: 1; }
+    .fact-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(255,107,53,0.3);
+    }
+    .fact-icon {
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+      display: block;
+    }
+    .fact-title {
+      font-family: var(--font-display);
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--mars-orange);
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .fact-desc {
+      font-family: var(--font-body);
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      font-weight: 300;
+      line-height: 1.6;
+    }
+
+    /* ============================================================
+       SECTION 4 — MARS LANDING
+    ============================================================ */
+    #landing {
+      background: linear-gradient(to bottom, #000008 0%, #0f0400 40%, #1a0800 100%);
+      flex-direction: column;
+      padding: 100px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+    .mars-surface {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 35%;
+      background:
+        radial-gradient(ellipse at 50% 100%, #3d1200 0%, #1a0800 60%, transparent 100%);
+    }
+    .mars-surface::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(to right, transparent, var(--mars-red), var(--mars-orange), var(--mars-red), transparent);
+      box-shadow: 0 0 20px var(--mars-red);
+    }
+
+    .crater {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(255,100,50,0.2);
+      background: radial-gradient(circle, rgba(0,0,0,0.4), transparent 70%);
+    }
+    .crater-1 { width:80px; height:30px; bottom:15%; left:15%; }
+    .crater-2 { width:140px; height:50px; bottom:20%; right:20%; }
+    .crater-3 { width:50px; height:20px; bottom:10%; left:45%; }
+
+    .mars-planet {
+      width: 300px; height: 300px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 35% 30%, #c15520 0%, transparent 50%),
+        radial-gradient(circle at 65% 65%, #8b2500 0%, transparent 45%),
+        radial-gradient(circle at 20% 70%, #a03010 0%, transparent 35%),
+        linear-gradient(135deg, #c1440e, #8b2500, #6b1800);
+      box-shadow:
+        0 0 80px rgba(193,68,14,0.5),
+        0 0 150px rgba(193,68,14,0.2),
+        inset -40px -40px 80px rgba(0,0,0,0.6);
+      margin-bottom: 60px;
+      position: relative;
+      animation: marsFloat 5s ease-in-out infinite;
+    }
+    .mars-planet::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 30% 25%, rgba(255,200,150,0.1) 0%, transparent 40%),
+        radial-gradient(circle at 55% 45%, rgba(150,60,20,0.3) 0%, transparent 30%),
+        radial-gradient(circle at 70% 70%, rgba(100,30,0,0.4) 0%, transparent 25%);
+    }
+    @keyframes marsFloat {
+      0%,100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-12px) rotate(1deg); }
+    }
+
+    .dust-storm {
+      position: absolute;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1s;
+    }
+    .dust-storm.active { opacity: 1; }
+    .dust-particle {
+      position: absolute;
+      width: 3px; height: 3px;
+      background: rgba(193,100,14,0.6);
+      border-radius: 50%;
+      animation: dustFloat linear infinite;
+    }
+    @keyframes dustFloat {
+      from { transform: translateX(-100px) translateY(0); opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      to   { transform: translateX(calc(100vw + 100px)) translateY(var(--drift)); opacity: 0; }
+    }
+
+    .landing-content {
+      text-align: center;
+      position: relative;
+      z-index: 2;
+    }
+    .landing-content h2 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 5vw, 4rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, #ff9966, var(--mars-glow), var(--mars-red));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 20px;
+    }
+    .landing-content p {
+      color: var(--text-dim);
+      max-width: 550px;
+      margin: 0 auto 40px;
+      font-weight: 300;
+    }
+
+    .storm-btn {
+      padding: 14px 32px;
+      border: 1px solid var(--mars-orange);
+      background: transparent;
+      color: var(--mars-orange);
+      font-family: var(--font-display);
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: none;
+      transition: all 0.3s;
+    }
+    .storm-btn:hover {
+      background: var(--mars-orange);
+      color: var(--black);
+      box-shadow: 0 0 30px rgba(232,98,42,0.4);
+    }
+
+    /* ============================================================
+       SECTION 5 — EXPLORATION
+    ============================================================ */
+    #exploration {
+      background: linear-gradient(to bottom, #1a0800 0%, #0d0500 100%);
+      flex-direction: column;
+      padding: 100px 24px;
+      min-height: 120vh;
+    }
+    .exploration-header {
+      text-align: center;
+      max-width: 700px;
+      margin-bottom: 80px;
+    }
+    .exploration-header h2 {
+      font-family: var(--font-display);
+      font-size: clamp(1.8rem, 4vw, 3.2rem);
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+    }
+    .exploration-header p {
+      color: var(--text-dim);
+      font-weight: 300;
+    }
+
+    .exploration-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 24px;
+      max-width: 1000px;
+      width: 100%;
+    }
+    .explore-card {
+      position: relative;
+      padding: 32px 24px;
+      border: 1px solid rgba(255,107,53,0.15);
+      background: rgba(26,8,0,0.8);
+      overflow: hidden;
+      cursor: none;
+      transition: transform 0.4s ease, border-color 0.4s;
+    }
+    .explore-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(to right, var(--mars-red), var(--mars-glow), var(--mars-red));
+      transform: scaleX(0);
+      transition: transform 0.5s ease;
+    }
+    .explore-card:hover::before { transform: scaleX(1); }
+    .explore-card:hover {
+      transform: translateY(-8px);
+      border-color: rgba(255,107,53,0.4);
+    }
+    .explore-card-bg {
+      position: absolute; inset: 0;
+      opacity: 0;
+      transition: opacity 0.4s;
+      background: radial-gradient(ellipse at 50% 100%, rgba(255,107,53,0.08), transparent 70%);
+    }
+    .explore-card:hover .explore-card-bg { opacity: 1; }
+
+    .card-num {
+      font-family: var(--font-display);
+      font-size: 0.6rem;
+      letter-spacing: 0.3em;
+      color: var(--mars-red);
+      margin-bottom: 16px;
+      display: block;
+    }
+    .card-icon { font-size: 2.2rem; margin-bottom: 16px; display: block; }
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+    }
+    .card-desc {
+      font-size: 0.85rem;
+      color: var(--text-dim);
+      font-weight: 300;
+      line-height: 1.7;
+    }
+    .card-tag {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 4px 12px;
+      border: 1px solid rgba(255,107,53,0.3);
+      font-family: var(--font-mono);
+      font-size: 0.55rem;
+      letter-spacing: 0.2em;
+      color: var(--mars-orange);
+      text-transform: uppercase;
+    }
+
+    /* ============================================================
+       SECTION 6 — CONCLUSION
+    ============================================================ */
+    #conclusion {
+      background: radial-gradient(ellipse at 50% 50%, #1a0800 0%, #000008 70%);
+      flex-direction: column;
+      text-align: center;
+      padding: 120px 24px;
+      position: relative;
+    }
+    .conclusion-content { max-width: 700px; position: relative; z-index: 1; }
+    .conclusion-content h2 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 6vw, 5rem);
+      font-weight: 900;
+      line-height: 0.95;
+      background: linear-gradient(135deg, #ffffff, #ffbb88, var(--mars-glow));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 32px;
+    }
+    .conclusion-content p {
+      font-size: 1.1rem;
+      color: var(--text-dim);
+      font-weight: 300;
+      line-height: 1.8;
+      margin-bottom: 48px;
+    }
+    .mission-badge {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 24px 48px;
+      border: 1px solid rgba(255,107,53,0.3);
+      background: rgba(255,107,53,0.05);
+      position: relative;
+    }
+    .mission-badge::before,
+    .mission-badge::after {
+      content: '';
+      position: absolute;
+      width: 10px; height: 10px;
+      border-color: var(--mars-glow);
+      border-style: solid;
+    }
+    .mission-badge::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+    .mission-badge::after  { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+    .badge-title {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.4em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+    .badge-main {
+      font-family: var(--font-display);
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--mars-glow);
+      letter-spacing: 0.1em;
+    }
+    .badge-sub {
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      letter-spacing: 0.2em;
+    }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      position: relative; z-index: 1;
+      padding: 32px 48px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: var(--text-dim);
+    }
+
+    /* ============================================================
+       PARALLAX LAYERS
+    ============================================================ */
+    .parallax-layer {
+      position: absolute; inset: 0;
+      pointer-events: none;
+    }
+
+    /* ============================================================
+       RESPONSIVE
+    ============================================================ */
+    @media (max-width: 768px) {
+      nav { padding: 16px 24px; }
+      .nav-links { display: none; }
+      .launch-inner { grid-template-columns: 1fr; gap: 40px; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      footer { flex-direction: column; gap: 8px; text-align: center; }
+      .earth-container, .earth { width: 200px; height: 200px; }
+      .mars-planet { width: 200px; height: 200px; }
+      .exploration-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Custom Cursor -->
+  <div class="cursor" id="cursor"></div>
+  <div class="cursor-ring" id="cursorRing"></div>
+
+  <!-- Loader -->
+  <div id="loader">
+    <div class="loader-ring"></div>
+    <div class="loader-pct" id="loaderPct">0%</div>
+    <div class="loader-text">Initializing Mission Systems</div>
+  </div>
+
+  <!-- Progress Bar -->
+  <div class="progress-bar" id="progressBar"></div>
+
+  <!-- Star Canvas -->
+  <canvas id="starCanvas"></canvas>
+
+  <!-- Navigation -->
+  <nav>
+    <div class="nav-logo">Mission: Mars</div>
+    <ul class="nav-links">
+      <li><a href="#hero">Earth</a></li>
+      <li><a href="#launch">Launch</a></li>
+      <li><a href="#space">Transit</a></li>
+      <li><a href="#landing">Landing</a></li>
+      <li><a href="#exploration">Explore</a></li>
+    </ul>
+  </nav>
+
+  <!-- =====================================================
+       SECTION 1 — HERO
+  ===================================================== -->
+  <section id="hero">
+    <div class="parallax-layer" id="heroParallax"></div>
+    <div class="earth-container reveal">
+      <div class="earth-glow"></div>
+      <div class="earth">
+        <div class="earth-clouds"></div>
+      </div>
+      <div class="orbit-ring"><div class="orbit-dot"></div></div>
+    </div>
+    <div>
+      <p class="hero-eyebrow">Mission Alpha — Year 2047</p>
+      <h1 class="hero-title">Journey<br>to Mars</h1>
+      <p class="hero-sub">Humanity's greatest adventure begins here — an interactive voyage across 225 million kilometers of empty space.</p>
+      <a href="#launch" class="cta-btn">
+        <span>Begin the Mission</span>
+        <span class="cta-arrow">→</span>
+      </a>
+    </div>
+    <div class="scroll-hint">
+      <span>Scroll to Explore</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SECTION 2 — LAUNCH
+  ===================================================== -->
+  <section id="launch">
+    <div class="launch-inner">
+
+      <div class="launch-visual">
+        <div class="rocket-wrapper" id="rocketWrapper">
+          <!-- SVG Rocket -->
+          <svg class="rocket-svg" viewBox="0 0 80 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Body -->
+            <path d="M40 10 C50 10, 60 30, 60 70 L60 120 L20 120 L20 70 C20 30, 30 10, 40 10Z"
+                  fill="url(#bodyGrad)" stroke="rgba(255,107,53,0.4)" stroke-width="0.5"/>
+            <!-- Nose -->
+            <path d="M40 5 C42 5, 48 15, 50 25 L30 25 C32 15, 38 5, 40 5Z"
+                  fill="#ddd"/>
+            <!-- Window -->
+            <circle cx="40" cy="60" r="8" fill="#1a3a6e" stroke="rgba(100,200,255,0.5)" stroke-width="1"/>
+            <circle cx="40" cy="60" r="5" fill="#0d2855"/>
+            <circle cx="37" cy="57" r="2" fill="rgba(200,230,255,0.4)"/>
+            <!-- Fins Left -->
+            <path d="M20 100 L5 125 L20 120Z" fill="url(#finGrad)" stroke="rgba(255,107,53,0.3)" stroke-width="0.5"/>
+            <!-- Fins Right -->
+            <path d="M60 100 L75 125 L60 120Z" fill="url(#finGrad)" stroke="rgba(255,107,53,0.3)" stroke-width="0.5"/>
+            <!-- Nozzle -->
+            <rect x="30" y="120" width="20" height="10" rx="2" fill="#666"/>
+            <rect x="33" y="130" width="14" height="6" rx="1" fill="#555"/>
+
+            <defs>
+              <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#bbb"/>
+                <stop offset="40%" stop-color="#eee"/>
+                <stop offset="100%" stop-color="#999"/>
+              </linearGradient>
+              <linearGradient id="finGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#c1440e"/>
+                <stop offset="100%" stop-color="#8b2500"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="exhaust">
+            <div class="exhaust-flame"></div>
+          </div>
+        </div>
+        <div class="launch-pad">
+          <div class="launch-pad-legs">
+            <div class="pad-leg"></div>
+            <div class="pad-leg"></div>
+          </div>
+        </div>
+        <div class="countdown-display" id="countdownDisplay">T-10</div>
+      </div>
+
+      <div class="launch-text">
+        <p class="section-label reveal">Phase 01 — Launch</p>
+        <h2 class="reveal delay-1">The <em>Ignition</em> That Changed Everything</h2>
+        <p class="reveal delay-2">On a crisp morning in 2047, the world held its breath. The most powerful rocket ever built — carrying humanity's hopes — sat on the launchpad, ready to pierce the sky and head for the Red Planet.</p>
+        <button class="launch-btn" id="launchBtn">
+          ▶ &nbsp;Initiate Launch Sequence
+        </button>
+        <div class="stats-grid reveal delay-3">
+          <div class="stat-card">
+            <span class="stat-val">7.5M</span>
+            <span class="stat-lbl">Lbs Thrust</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-val">100T</span>
+            <span class="stat-lbl">Payload Mass</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-val">3</span>
+            <span class="stat-lbl">Stage Separation</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SECTION 3 — SPACE TRAVEL
+  ===================================================== -->
+  <section id="space">
+    <div class="space-inner">
+      <p class="section-label reveal">Phase 02 — Transit</p>
+      <h2 class="reveal delay-1">225 Million Kilometers<br>of <span style="color:var(--mars-glow)">Empty Silence</span></h2>
+      <p class="reveal delay-2">For 7 months, the crew drifted through the void — weightless, isolated, and awed by the infinite darkness surrounding them.</p>
+
+      <div class="distance-tracker reveal delay-2">
+        <div class="tracker-label">
+          <span>🌍 Earth</span>
+          <span>🔴 Mars</span>
+        </div>
+        <div class="tracker-bar">
+          <div class="tracker-fill" id="trackerFill"></div>
+          <div class="tracker-rocket" id="trackerRocket">🚀</div>
+        </div>
+        <div class="tracker-km" id="trackerKm">0</div>
+        <div class="tracker-km-label">kilometers traveled</div>
+      </div>
+
+      <div class="space-facts">
+        <div class="fact-card reveal delay-2" data-tilt>
+          <span class="fact-icon">⚡</span>
+          <span class="fact-title">Solar Radiation</span>
+          <p class="fact-desc">Deep space exposes travelers to radiation levels 300× higher than on Earth's surface.</p>
+        </div>
+        <div class="fact-card reveal delay-3" data-tilt>
+          <span class="fact-icon">🌡️</span>
+          <span class="fact-title">Temperature</span>
+          <p class="fact-desc">The vacuum of space registers at -270°C — just 3 degrees above absolute zero.</p>
+        </div>
+        <div class="fact-card reveal delay-4" data-tilt>
+          <span class="fact-icon">⏱️</span>
+          <span class="fact-title">Duration</span>
+          <p class="fact-desc">At optimal orbital alignment, the journey takes approximately 7 months one-way.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SECTION 4 — MARS LANDING
+  ===================================================== -->
+  <section id="landing">
+    <div class="parallax-layer">
+      <div class="mars-surface">
+        <div class="crater crater-1"></div>
+        <div class="crater crater-2"></div>
+        <div class="crater crater-3"></div>
+      </div>
+    </div>
+
+    <div class="dust-storm" id="dustStorm"></div>
+
+    <div class="landing-content">
+      <p class="section-label reveal">Phase 03 — Landing</p>
+      <div class="mars-planet reveal delay-1"></div>
+      <h2 class="reveal delay-2">Touchdown on<br>the Red Planet</h2>
+      <p class="reveal delay-3">The heat shield blazes at 1,600°C. Parachutes deploy. Retro-rockets fire. And then — silence. Humanity stands on another world for the first time.</p>
+      <button class="storm-btn reveal delay-4" id="stormBtn">
+        ⛈ Trigger Dust Storm
+      </button>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SECTION 5 — EXPLORATION
+  ===================================================== -->
+  <section id="exploration">
+    <div class="exploration-header">
+      <p class="section-label reveal">Phase 04 — Exploration</p>
+      <h2 class="reveal delay-1">Discovering <span style="color:var(--mars-glow)">Another World</span></h2>
+      <p class="reveal delay-2">The first humans on Mars begin mapping, sampling, and uncovering the ancient secrets of this alien landscape.</p>
+    </div>
+
+    <div class="exploration-grid">
+      <div class="explore-card reveal">
+        <div class="explore-card-bg"></div>
+        <span class="card-num">01 / GEOLOGY</span>
+        <span class="card-icon">🪨</span>
+        <div class="card-title">Ancient Rock Samples</div>
+        <p class="card-desc">Scientists drill into 3-billion-year-old Martian rock, searching for fossilized microbial life and signs of ancient oceans.</p>
+        <span class="card-tag">Active Research</span>
+      </div>
+      <div class="explore-card reveal delay-1">
+        <div class="explore-card-bg"></div>
+        <span class="card-num">02 / ATMOSPHERE</span>
+        <span class="card-icon">🌬️</span>
+        <div class="card-title">Atmospheric Analysis</div>
+        <p class="card-desc">Mars breathes thin CO₂ — 95% of it. The MOXIE experiment converts it to oxygen, proving future colonists can breathe Martian air.</p>
+        <span class="card-tag">Breakthrough</span>
+      </div>
+      <div class="explore-card reveal delay-2">
+        <div class="explore-card-bg"></div>
+        <span class="card-num">03 / WATER ICE</span>
+        <span class="card-icon">🧊</span>
+        <div class="card-title">Subsurface Ice Deposits</div>
+        <p class="card-desc">Ground-penetrating radar reveals vast lakes of frozen water beneath the Martian poles — fuel for rocket propellant and drinking water.</p>
+        <span class="card-tag">Discovery</span>
+      </div>
+      <div class="explore-card reveal delay-3">
+        <div class="explore-card-bg"></div>
+        <span class="card-num">04 / BASE CAMP</span>
+        <span class="card-icon">🏕️</span>
+        <div class="card-title">Habitat Construction</div>
+        <p class="card-desc">3D-printed structures made from Martian regolith provide radiation shielding. The first permanent human settlement takes shape.</p>
+        <span class="card-tag">In Progress</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================
+       SECTION 6 — CONCLUSION
+  ===================================================== -->
+  <section id="conclusion">
+    <div class="conclusion-content">
+      <p class="section-label reveal">Mission Complete</p>
+      <h2 class="reveal delay-1">We Are<br>Not Alone<br>in the Universe.</h2>
+      <p class="reveal delay-2">The journey to Mars is more than a mission — it is a declaration. That humanity is not bound to a single world. That curiosity is our greatest engine. That the universe is not our limit, but our destination.</p>
+      <div class="mission-badge reveal delay-3">
+        <span class="badge-title">Mission Status</span>
+        <span class="badge-main">MISSION SUCCESS</span>
+        <span class="badge-sub">Year 2047 · Sol 1 · 225,000,000 km from Earth</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <span>© 2047 MISSION: MARS</span>
+    <span>INTERACTIVE WEB EXPERIENCE</span>
+    <span>FRONTEND ODYSSEY CHALLENGE</span>
+  </footer>
+
+  <!-- ============================================================
+       JAVASCRIPT
+  ============================================================ -->
+  <script>
+  (function() {
+    'use strict';
+
+    /* ----------------------------------------------------------
+       LOADER
+    ---------------------------------------------------------- */
+    const loader  = document.getElementById('loader');
+    const loaderPct = document.getElementById('loaderPct');
+    let pct = 0;
+    const loadInt = setInterval(() => {
+      pct += Math.floor(Math.random() * 8) + 3;
+      if (pct >= 100) { pct = 100; clearInterval(loadInt); }
+      loaderPct.textContent = pct + '%';
+      if (pct === 100) {
+        setTimeout(() => { loader.classList.add('hidden'); }, 400);
+      }
+    }, 80);
+
+    /* ----------------------------------------------------------
+       CUSTOM CURSOR
+    ---------------------------------------------------------- */
+    const cursor     = document.getElementById('cursor');
+    const cursorRing = document.getElementById('cursorRing');
+    let mx = 0, my = 0, rx = 0, ry = 0;
+
+    document.addEventListener('mousemove', e => {
+      mx = e.clientX; my = e.clientY;
+      cursor.style.left = mx + 'px';
+      cursor.style.top  = my + 'px';
+    });
+
+    (function animRing() {
+      rx += (mx - rx) * 0.12;
+      ry += (my - ry) *.12;
+      cursorRing.style.left = rx + 'px';
+      cursorRing.style.top  = ry + 'px';
+      requestAnimationFrame(animRing);
+    })();
+
+    document.querySelectorAll('a, button, .explore-card, .fact-card, .stat-card').forEach(el => {
+      el.addEventListener('mouseenter', () => {
+        cursor.style.width  = '20px';
+        cursor.style.height = '20px';
+        cursorRing.style.width  = '60px';
+        cursorRing.style.height = '60px';
+      });
+      el.addEventListener('mouseleave', () => {
+        cursor.style.width  = '12px';
+        cursor.style.height = '12px';
+        cursorRing.style.width  = '40px';
+        cursorRing.style.height = '40px';
+      });
+    });
+
+    /* ----------------------------------------------------------
+       STARFIELD CANVAS
+    ---------------------------------------------------------- */
+    const canvas = document.getElementById('starCanvas');
+    const ctx    = canvas.getContext('2d');
+    let W, H, stars = [];
+
+    function resizeCanvas() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    function createStars(n) {
+      stars = [];
+      for (let i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: Math.random() * 1.5 + 0.2,
+          o: Math.random(),
+          speed: Math.random() * 0.3 + 0.05,
+          twinkleSpeed: Math.random() * 0.02 + 0.005
+        });
+      }
+    }
+    createStars(300);
+
+    let scrollY = 0;
+    window.addEventListener('scroll', () => { scrollY = window.scrollY; });
+
+    function drawStars(ts) {
+      ctx.clearRect(0, 0, W, H);
+      const parallax = scrollY * 0.2;
+      stars.forEach(s => {
+        s.o += s.twinkleSpeed;
+        const opacity = Math.abs(Math.sin(s.o)) * 0.8 + 0.2;
+        ctx.beginPath();
+        ctx.arc(s.x, (s.y + parallax) % H, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(232,232,255,${opacity})`;
+        ctx.fill();
+      });
+      requestAnimationFrame(drawStars);
+    }
+    requestAnimationFrame(drawStars);
+
+    /* ----------------------------------------------------------
+       SCROLL PROGRESS BAR
+    ---------------------------------------------------------- */
+    const progressBar = document.getElementById('progressBar');
+    window.addEventListener('scroll', () => {
+      const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+      progressBar.style.width = (pct * 100) + '%';
+    });
+
+    /* ----------------------------------------------------------
+       REVEAL ON SCROLL
+    ---------------------------------------------------------- */
+    const reveals = document.querySelectorAll('.reveal, .section-label');
+    const revealObs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          e.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.15 });
+    reveals.forEach(r => revealObs.observe(r));
+
+    /* ----------------------------------------------------------
+       LAUNCH SEQUENCE
+    ---------------------------------------------------------- */
+    const launchBtn    = document.getElementById('launchBtn');
+    const countdownEl  = document.getElementById('countdownDisplay');
+    const rocketWrapper = document.getElementById('rocketWrapper');
+    let launched = false;
+
+    launchBtn.addEventListener('click', () => {
+      if (launched) return;
+      launched = true;
+      launchBtn.disabled = true;
+      launchBtn.textContent = '🚀 Launch in Progress...';
+
+      let count = 10;
+      countdownEl.textContent = 'T-' + count;
+      const cd = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countdownEl.textContent = 'T-' + count;
+        } else {
+          clearInterval(cd);
+          countdownEl.textContent = '🚀 LIFTOFF!';
+          rocketWrapper.classList.add('launching');
+          countdownEl.style.textShadow = '0 0 60px var(--mars-glow)';
+          setTimeout(() => {
+            launchBtn.textContent = '✓ Mission Launched';
+            launchBtn.style.background = '#1a5c1a';
+            launchBtn.style.border = '1px solid #2d8c2d';
+          }, 2500);
+        }
+      }, 700);
+    });
+
+    /* ----------------------------------------------------------
+       DISTANCE TRACKER (scroll-based)
+    ---------------------------------------------------------- */
+    const trackerFill   = document.getElementById('trackerFill');
+    const trackerRocket = document.getElementById('trackerRocket');
+    const trackerKm     = document.getElementById('trackerKm');
+    const spaceSection  = document.getElementById('space');
+
+    function formatNum(n) {
+      return Math.floor(n).toLocaleString();
+    }
+
+    const trackerObs = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          let km = 0;
+          const target = 225000000;
+          const duration = 2000;
+          const start = performance.now();
+          function animKm(now) {
+            const t = Math.min((now - start) / duration, 1);
+            const ease = 1 - Math.pow(1 - t, 3);
+            km = ease * target;
+            trackerFill.style.width  = (ease * 100) + '%';
+            trackerRocket.style.right = ((1 - ease) * 100) + '%';
+            trackerKm.textContent = formatNum(km);
+            if (t < 1) requestAnimationFrame(animKm);
+          }
+          requestAnimationFrame(animKm);
+          trackerObs.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.3 });
+    trackerObs.observe(spaceSection);
+
+    /* ----------------------------------------------------------
+       CARD TILT (fact cards)
+    ---------------------------------------------------------- */
+    document.querySelectorAll('.fact-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const rect = card.getBoundingClientRect();
+        const x = (e.clientX - rect.left) / rect.width  - 0.5;
+        const y = (e.clientY - rect.top)  / rect.height - 0.5;
+        card.style.transform = `perspective(600px) rotateY(${x * 12}deg) rotateX(${-y * 12}deg) translateY(-4px)`;
+        card.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - rect.top)  / rect.height * 100) + '%');
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transform = '';
+      });
+    });
+
+    /* ----------------------------------------------------------
+       DUST STORM
+    ---------------------------------------------------------- */
+    const stormBtn   = document.getElementById('stormBtn');
+    const dustStorm  = document.getElementById('dustStorm');
+    let stormActive  = false;
+
+    stormBtn.addEventListener('click', () => {
+      stormActive = !stormActive;
+      if (stormActive) {
+        dustStorm.innerHTML = '';
+        for (let i = 0; i < 60; i++) {
+          const p = document.createElement('div');
+          p.className = 'dust-particle';
+          p.style.cssText = `
+            top: ${Math.random() * 100}%;
+            left: ${-100 + Math.random() * 50}px;
+            width: ${Math.random() * 4 + 1}px;
+            height: ${Math.random() * 4 + 1}px;
+            animation-duration: ${Math.random() * 4 + 3}s;
+            animation-delay: ${Math.random() * 3}s;
+            --drift: ${(Math.random() - 0.5) * 100}px;
+            opacity: ${Math.random() * 0.6 + 0.2};
+          `;
+          dustStorm.appendChild(p);
+        }
+        dustStorm.classList.add('active');
+        stormBtn.textContent = '✓ Storm Cleared';
+        stormBtn.style.borderColor = 'var(--mars-glow)';
+        stormBtn.style.color = 'var(--mars-glow)';
+      } else {
+        dustStorm.classList.remove('active');
+        setTimeout(() => { dustStorm.innerHTML = ''; }, 1000);
+        stormBtn.textContent = '⛈ Trigger Dust Storm';
+        stormBtn.style.borderColor = '';
+        stormBtn.style.color = '';
+      }
+    });
+
+    /* ----------------------------------------------------------
+       PARALLAX ON SCROLL (hero earth)
+    ---------------------------------------------------------- */
+    const heroSection = document.getElementById('hero');
+    window.addEventListener('scroll', () => {
+      const sy = window.scrollY;
+      const earthEl = document.querySelector('.earth-container');
+      if (earthEl && sy < window.innerHeight) {
+        earthEl.style.transform = `translateY(${sy * 0.3}px) scale(${1 - sy * 0.0002})`;
+      }
+    });
+
+  })();
+  </script>
+</body>
+</html>
